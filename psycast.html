@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Psycast · Seguimiento</title>
+  <style>
+    :root{
+      --bg:#f5f7fa; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+      --line:#e5e7eb; --primary:#2f6f7e; --primary-2:#3f8999;
+      --success:#dff4e4; --warning:#fff2cc; --danger:#fde2e2; --gray:#d1d5db;
+      --shadow:0 8px 24px rgba(0,0,0,.06);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+    .wrap{max-width:1400px;margin:auto;padding:18px}
+    .top{display:flex;gap:16px;align-items:center;justify-content:space-between}
+    .brand h1{margin:0;font-size:24px}.brand small{color:var(--muted)}
+    nav{display:flex;gap:8px;flex-wrap:wrap}
+    nav button{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    nav button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .section{display:none}.section.active{display:block}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0 18px}
+    button,input,select,textarea{font:inherit}
+    .btn{border:0;background:var(--primary);color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    .btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+    .btn.gray{background:#6b7280}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+    .grid{display:grid;gap:16px}.grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media(max-width:900px){.grid.cols-2,.grid.cols-3{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+    th{background:#f8fafc}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:#eef2f7}
+    .status-visto{background:var(--success)} .status-ausencia{background:var(--warning)} .status-cancelacion{background:var(--danger)}
+    .rented{background:#e5e7eb !important;color:#374151}
+    .professional{border-left:6px solid var(--primary)}
+    .muted{color:var(--muted)}
+    .day-grid{display:grid;grid-template-columns:110px 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+    .day-grid>div{background:#fff;padding:10px}
+    .day-grid .head{font-weight:700;background:#f8fafc}
+    .slot{min-height:64px}
+    .slot strong{display:block;margin-bottom:6px}
+    .pill{display:inline-block;margin:2px 4px 2px 0;padding:4px 7px;border-radius:7px;background:#eef5f7;font-size:12px}
+    dialog{border:0;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:min(560px,94vw)}
+    dialog::backdrop{background:rgba(0,0,0,.35)}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .form-grid .full{grid-column:1/-1}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+    input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+    .kpi{font-size:28px;font-weight:700}.kpi-label{color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="brand">
+      <h1>Psycast</h1>
+      <small>Software de seguimiento</small>
+    </div>
+    <nav id="tabs">
+      <button data-tab="despacho" class="active">Despacho</button>
+      <button data-tab="profesional">Por profesional</button>
+      <button data-tab="informes">Informes</button>
+      <button data-tab="donaciones">Donaciones</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="despacho" class="section active">
+    <div class="toolbar">
+      <button class="btn" onclick="openBlockModal()">Asignar bloque</button>
+      <button class="btn gray" onclick="openRentalModal()">Bloquear como alquilado</button>
+      <button class="btn secondary" onclick="changeWeek(-1)">← Semana anterior</button>
+      <button class="btn secondary" onclick="changeWeek(1)">Semana siguiente →</button>
+      <span id="weekLabel" class="muted"></span>
+    </div>
+    <div class="card">
+      <div id="schedule"></div>
+    </div>
+  </section>
+
+  <section id="profesional" class="section">
+    <div class="toolbar">
+      <select id="professionalSelect"></select>
+      <button class="btn" onclick="openPatientModal()">Añadir paciente</button>
+    </div>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Pacientes activos</h3>
+        <div id="patientList"></div>
+      </div>
+      <div class="card">
+        <h3>Agenda de seguimiento</h3>
+        <div id="followupList"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="informes" class="section">
+    <div class="grid cols-3">
+      <div class="card"><div class="kpi" id="kpiPatients">0</div><div class="kpi-label">Pacientes activos</div></div>
+      <div class="card"><div class="kpi" id="kpiAppointments">0</div><div class="kpi-label">Citas registradas</div></div>
+      <div class="card"><div class="kpi" id="kpiRentals">0</div><div class="kpi-label">Bloques alquilados</div></div>
+    </div>
+    <div class="card">
+      <h3>Resumen por profesional</h3>
+      <div id="reportTable"></div>
+    </div>
+  </section>
+
+  <section id="donaciones" class="section">
+    <div class="card">
+      <h3>Donaciones</h3>
+      <p class="muted">Registro básico de donaciones o aportaciones vinculadas a Psycast.</p>
+      <div class="toolbar">
+        <input id="donorName" placeholder="Nombre / entidad">
+        <input id="donationAmount" type="number" min="0" step="0.01" placeholder="Importe (€)">
+        <button class="btn" onclick="addDonation()">Añadir</button>
+      </div>
+      <div id="donationList"></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="blockModal">
+  <form method="dialog" onsubmit="saveBlock(event)">
+    <h3>Asignar bloque de despacho</h3>
+    <div class="form-grid">
+      <div><label>Fecha</label><input id="blockDate" type="date" required></div>
+      <div><label>Bloque</label><select id="blockShift"><option value="08:00-15:00">08:00–15:00</option><option value="15:00-22:00">15:00–22:00</option></select></div>
+      <div class="full"><label>Profesional</label><select id="blockProfessional"></select></div>
+      <div class="full"><label>Paciente / cita opcional</label><input id="blockAppointment" placeholder="Ej. 10:00 · Paciente A"></div>
+    </div>
+    <div class="toolbar" style="justify-content:flex-end">
+      <button class="btn secondary" value="cancel">Cancelar</button>
+      <button class="btn" value="default">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="rentalModal">
+  <form method="dialog" onsubmit="saveRental(event)">
+    <h3>Bloquear despacho como alquilado</h3>
+    <div class="form-grid">
+      <div><label>Desde</label><input id="rentalStart" type="date" required></div>
+      <div><label>Hasta</label><input id="rentalEnd" type="date" required></div>
+      <div class="full"><label>Bloque</label><select id="rentalShift"><option value="08:00-15:00">08:00–15:00</option><option value="15:00-22:00">15:00–22:00</option></select></div>
+      <div class="full"><label>Concepto</label><input value="Alquilado" disabled></div>
+    </div>
+    <div class="toolbar" style="justify-content:flex-end">
+      <button class="btn secondary" value="cancel">Cancelar</button>
+      <button class="btn gray" value="default">Bloquear</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="patientModal">
+  <form method="dialog" onsubmit="savePatient(event)">
+    <h3>Añadir paciente</h3>
+    <div class="form-grid">
+      <div class="full"><label>Nombre</label><input id="patientName" required></div>
+      <div><label>Frecuencia</label><select id="patientFrequency"><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>A demanda</option></select></div>
+      <div><label>Estado</label><select id="patientStatus"><option>Activo</option><option>Alta</option></select></div>
+    </div>
+    <div class="toolbar" style="justify-content:flex-end">
+      <button class="btn secondary" value="cancel">Cancelar</button>
+      <button class="btn" value="default">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const professionals = [
+  {name:"Pedro", color:"#2f6f7e"},
+  {name:"Belén", color:"#7c3aed"},
+  {name:"Isabel", color:"#c2410c"},
+  {name:"Débora", color:"#0f766e"},
+  {name:"José Luis", color:"#be123c"}
+];
+
+const state = JSON.parse(localStorage.getItem("psycastData") || '{"blocks":[],"patients":[],"donations":[],"appointments":[]}');
+let weekOffset = 0;
+
+function save(){ localStorage.setItem("psycastData", JSON.stringify(state)); renderAll(); }
+
+document.querySelectorAll("#tabs button").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll("#tabs button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+    renderAll();
+  };
+});
+
+function mondayOfWeek(d){
+  d=new Date(d); const day=d.getDay()||7; d.setDate(d.getDate()-day+1); d.setHours(0,0,0,0); return d;
+}
+function ymd(d){ return d.toISOString().slice(0,10); }
+function fmt(d){ return d.toLocaleDateString("es-ES",{weekday:"short",day:"2-digit",month:"2-digit"}); }
+
+function renderSchedule(){
+  const monday=mondayOfWeek(new Date()); monday.setDate(monday.getDate()+weekOffset*7);
+  const friday=new Date(monday); friday.setDate(friday.getDate()+4);
+  document.getElementById("weekLabel").textContent=`${monday.toLocaleDateString("es-ES")} – ${friday.toLocaleDateString("es-ES")}`;
+  let html='<div class="day-grid"><div class="head">Día</div><div class="head">08:00–15:00</div><div class="head">15:00–22:00</div>';
+  for(let i=0;i<5;i++){
+    const d=new Date(monday); d.setDate(monday.getDate()+i); const ds=ymd(d);
+    html+=`<div class="head">${fmt(d)}</div>`;
+    for(const shift of ["08:00-15:00","15:00-22:00"]){
+      const block=state.blocks.find(b=>b.date===ds && b.shift===shift);
+      if(block){
+        if(block.type==="rental"){
+          html+=`<div class="slot rented"><strong>Alquilado</strong><span class="badge">Bloque reservado</span></div>`;
+        }else{
+          const p=professionals.find(x=>x.name===block.professional);
+          html+=`<div class="slot professional" style="border-left-color:${p?.color||'#2f6f7e'}"><strong>${block.professional}</strong>${block.appointment?`<span class="pill">${block.appointment}</span>`:""}<br><button class="btn secondary" style="margin-top:8px;padding:5px 8px" onclick="removeBlock('${ds}','${shift}')">Liberar</button></div>`;
+        }
+      } else {
+        html+=`<div class="slot muted">Disponible</div>`;
+      }
+    }
+  }
+  html+='</div>'; document.getElementById("schedule").innerHTML=html;
+}
+
+function changeWeek(delta){ weekOffset+=delta; renderSchedule(); }
+
+function openBlockModal(){ blockModal.showModal(); }
+function openRentalModal(){ rentalModal.showModal(); }
+function openPatientModal(){ patientModal.showModal(); }
+
+function saveBlock(e){
+  e.preventDefault();
+  const date=blockDate.value, shift=blockShift.value, professional=blockProfessional.value, appointment=blockAppointment.value.trim();
+  state.blocks=state.blocks.filter(b=>!(b.date===date && b.shift===shift));
+  state.blocks.push({date,shift,type:"professional",professional,appointment}); save(); blockModal.close();
+}
+function saveRental(e){
+  e.preventDefault();
+  const start=new Date(rentalStart.value), end=new Date(rentalEnd.value), shift=rentalShift.value;
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    const day=d.getDay(); if(day===0||day===6) continue;
+    const ds=ymd(d);
+    state.blocks=state.blocks.filter(b=>!(b.date===ds && b.shift===shift));
+    state.blocks.push({date:ds,shift,type:"rental"});
+  }
+  save(); rentalModal.close();
+}
+function removeBlock(date,shift){ state.blocks=state.blocks.filter(b=>!(b.date===date&&b.shift===shift)); save(); }
+
+function renderProfessionals(){
+  const selects=[professionalSelect,blockProfessional];
+  selects.forEach(sel=>{
+    const current=sel.value;
+    sel.innerHTML=professionals.map(p=>`<option>${p.name}</option>`).join("");
+    if(current) sel.value=current;
+  });
+  professionalSelect.onchange=renderPatients;
+  renderPatients();
+}
+
+function savePatient(e){
+  e.preventDefault();
+  state.patients.push({id:Date.now(), professional:professionalSelect.value, name:patientName.value.trim(), frequency:patientFrequency.value, status:patientStatus.value});
+  patientName.value=""; save(); patientModal.close();
+}
+function renderPatients(){
+  const p=professionalSelect.value || professionals[0].name;
+  const list=state.patients.filter(x=>x.professional===p);
+  patientList.innerHTML=list.length?list.map(x=>`<div class="card" style="box-shadow:none"><strong>${x.name}</strong><br><span class="badge">${x.frequency}</span> <span class="badge">${x.status}</span><div class="toolbar"><button class="btn secondary" onclick="deletePatient(${x.id})">Eliminar</button></div></div>`).join(""):'<p class="muted">Sin pacientes registrados.</p>';
+  followupList.innerHTML=list.length?list.map(x=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)"><strong>${x.name}</strong><br><span class="muted">Seguimiento: ${x.frequency}</span></div>`).join(""):'<p class="muted">Sin seguimientos pendientes.</p>';
+}
+function deletePatient(id){ state.patients=state.patients.filter(x=>x.id!==id); save(); }
+
+function addDonation(){
+  const name=donorName.value.trim(), amount=parseFloat(donationAmount.value);
+  if(!name || isNaN(amount)) return;
+  state.donations.push({id:Date.now(),name,amount,date:new Date().toISOString()});
+  donorName.value=""; donationAmount.value=""; save();
+}
+function renderDonations(){
+  donationList.innerHTML=state.donations.length?`<table><thead><tr><th>Fecha</th><th>Nombre / entidad</th><th>Importe</th></tr></thead><tbody>${state.donations.map(d=>`<tr><td>${new Date(d.date).toLocaleDateString("es-ES")}</td><td>${d.name}</td><td>${d.amount.toFixed(2)} €</td></tr>`).join("")}</tbody></table>`:'<p class="muted">Sin donaciones registradas.</p>';
+}
+function renderReports(){
+  kpiPatients.textContent=state.patients.filter(p=>p.status==="Activo").length;
+  kpiAppointments.textContent=state.appointments.length;
+  kpiRentals.textContent=state.blocks.filter(b=>b.type==="rental").length;
+  reportTable.innerHTML=`<table><thead><tr><th>Profesional</th><th>Pacientes activos</th><th>Bloques asignados</th></tr></thead><tbody>${professionals.map(p=>`<tr><td>${p.name}</td><td>${state.patients.filter(x=>x.professional===p.name&&x.status==="Activo").length}</td><td>${state.blocks.filter(b=>b.professional===p.name).length}</td></tr>`).join("")}</tbody></table>`;
+}
+function renderAll(){ renderSchedule(); renderProfessionals(); renderDonations(); renderReports(); }
+renderAll();
+</script>
+</body>
+</html>
