@@ -11,6 +11,7 @@ const PROFESSIONALS=[
  {name:'Ada',email:'ademusat@gmail.com',color:'#b45d82'}
 ];
 const FREQS=['Semanal','Quincenal','3 semanas','Mensual','Seguimiento'];
+const ADMIN_EMAILS=['pedropneira@gmail.com','carolmarin3.cm@gmail.com'];
 const storeKey='psycast-v2';
 const emptyData=()=>({blocks:{},bookings:{},patients:Object.fromEntries(PROFESSIONALS.map(p=>[p.name,[]])),donationRate:0});
 let data=JSON.parse(localStorage.getItem(storeKey)||'null')||emptyData();
@@ -164,14 +165,35 @@ function startRealtime(){
 function setAuthMessage(msg,bad=false){
   const el=$('authMessage'); if(!el)return; el.textContent=msg; el.className='auth-message'+(bad?' bad':'');
 }
+async function passwordLogin(){
+  const email=$('loginEmail').value.trim().toLowerCase(),password=$('loginPassword').value;
+  if(!PROFESSIONALS.some(p=>p.email.toLowerCase()===email)){setAuthMessage('Este correo no está autorizado para acceder a Psycast.',true);return}
+  if(!password){setAuthMessage('Introduce tu contraseña.',true);return}
+  $('loginBtn').disabled=true; setAuthMessage('Accediendo...');
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  $('loginBtn').disabled=false;
+  if(error){setAuthMessage('Correo o contraseña incorrectos.',true);return}
+}
 async function requestMagicLink(){
   const email=$('loginEmail').value.trim().toLowerCase();
   if(!PROFESSIONALS.some(p=>p.email.toLowerCase()===email)){setAuthMessage('Este correo no está autorizado para acceder a Psycast.',true);return}
-  $('loginBtn').disabled=true; setAuthMessage('Enviando enlace...');
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin,shouldCreateUser:true}});
-  $('loginBtn').disabled=false;
-  if(error){setAuthMessage('No se ha podido enviar el enlace. Inténtalo de nuevo.',true);return}
-  setAuthMessage('Te hemos enviado un enlace de acceso al correo. Ábrelo para entrar.');
+  $('magicLinkBtn').disabled=true; setAuthMessage('Enviando enlace...');
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin,shouldCreateUser:false}});
+  $('magicLinkBtn').disabled=false;
+  if(error){setAuthMessage('No se ha podido enviar el enlace. Usa tu contraseña o contacta con el administrador.',true);return}
+  setAuthMessage('Te hemos enviado un enlace de acceso al correo.');
+}
+async function changePassword(){
+  const a=$('newPassword').value,b=$('repeatPassword').value,msg=$('passwordMessage');
+  msg.textContent='';msg.className='auth-message';
+  if(a.length<8){msg.textContent='La contraseña debe tener al menos 8 caracteres.';msg.className='auth-message bad';return}
+  if(a!==b){msg.textContent='Las contraseñas no coinciden.';msg.className='auth-message bad';return}
+  $('savePasswordBtn').disabled=true;
+  const {error}=await sb.auth.updateUser({password:a});
+  $('savePasswordBtn').disabled=false;
+  if(error){msg.textContent='No se ha podido actualizar la contraseña.';msg.className='auth-message bad';return}
+  msg.textContent='Contraseña actualizada.';
+  setTimeout(()=>passwordDialog.close(),700);
 }
 async function enterApp(user){
   const email=(user.email||'').toLowerCase();
@@ -182,12 +204,17 @@ async function enterApp(user){
     setAuthMessage('Este correo no está autorizado para acceder a Psycast.',true);return;
   }
   $('currentUser').textContent=allowed.display_name||email;
+  $('currentRole').textContent=ADMIN_EMAILS.includes(email)?'Administrador':'Profesional';
   $('authScreen').style.display='none';$('appShell').hidden=false;
   try{await loadSharedData(true);startRealtime()}catch(e){console.error(e);alert('No se han podido cargar los datos compartidos.')}
 }
 async function initAuth(){
-  $('loginBtn').onclick=requestMagicLink;
-  $('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')requestMagicLink()});
+  $('loginBtn').onclick=passwordLogin;
+  $('magicLinkBtn').onclick=requestMagicLink;
+  $('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')passwordLogin()});
+  $('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')passwordLogin()});
+  $('changePasswordBtn').onclick=()=>{ $('newPassword').value='';$('repeatPassword').value='';$('passwordMessage').textContent='';passwordDialog.showModal() };
+  $('savePasswordBtn').onclick=changePassword;
   $('logoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload()};
   const {data:{session}}=await sb.auth.getSession();
   if(session)await enterApp(session.user);
